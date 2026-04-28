@@ -122,7 +122,7 @@
 
         case 'frame_received':
           nativeConnected = true;
-          updateStatus('🧠 VL推理中...', true);
+          updateStatus('⚡ VL推理中...', true);
           sendResponse({ success: true });
           break;
 
@@ -303,7 +303,7 @@
 
         <!-- 占位提示（总结到来前显示）-->
         <div id="summary-placeholder" style="padding: 20px 16px; color: #999; font-size: 13px; text-align: center; line-height: 1.8;">
-          <div style="font-size: 28px; margin-bottom: 8px;">🧠</div>
+          <div style="font-size: 28px; margin-bottom: 8px;">✨</div>
           <div>正在实时分析视频帧...</div>
           <div style="font-size: 12px; margin-top: 6px;">每 <strong>5 帧</strong>自动生成一次滚动总结</div>
           <div style="font-size: 12px; color: #bbb;">原始帧结果将在下方折叠展示</div>
@@ -462,7 +462,7 @@
 
     function _doPreloadVL() {
       console.log('[AI Video] ✅ 服务已连接，开始预加载 VL 模型');
-      updateStatus('🧠 预加载 VL 模型...', true);
+      updateStatus('⏳ 预加载 VL 模型...', true);
       showProgress(0, '正在预加载 VL 模型（首次较慢）...');
 
       // preload_vl 是异步操作：background 只同步返回 {sent:true}，
@@ -474,7 +474,7 @@
           return;
         }
         console.log('[AI Video] ⏳ VL 预加载请求已发送，等待模型加载完成...');
-        updateStatus('🧠 模型加载中...', true);
+        updateStatus('⏳ 模型加载中...', true);
         showProgress(10, '等待 Qwen2-VL 模型加载（首次约 10~30s）...');
       });
     }
