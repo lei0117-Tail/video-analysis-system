@@ -97,9 +97,12 @@
             showProgress(1, '截取首帧...');
             const videoEl = currentVideo || findVideoElement();
             if (videoEl) {
+              // 视觉帧轨
               captureAndSendFrame(videoEl);
               captureInterval = setInterval(() => captureAndSendFrame(videoEl), CAPTURE_INTERVAL_MS);
-              console.log('[AI Video] 实时帧分析已启动 (间隔=' + CAPTURE_INTERVAL_MS + 'ms)');
+              // 音频轨（独立循环，与截帧解耦）
+              startAudioTrack(videoEl);
+              console.log('[AI Video] 实时帧分析已启动 (间隔=' + CAPTURE_INTERVAL_MS + 'ms)，音频轨独立运行');
             } else {
               appendError('找不到视频元素，请刷新页面重试');
               stopAnalysis();
@@ -487,6 +490,7 @@
       captureInterval = null;
     }
     isSendingFrame = false;
+    stopAudioTrack();
     const btn = document.getElementById('ai-analyze-btn');
     if (btn) {
       btn.textContent = '👁️ AI 分析';
@@ -503,6 +507,139 @@
   let reconnectRetryCount = 0;
   let vlModelReady = false;
 
+  // =====================================================================
+  // 音频轨 — 独立持续录制，与截帧完全解耦
+  // 每 AUDIO_SEGMENT_MS 毫秒录一段，发送 audio_segment 消息到 Python
+  // =====================================================================
+  const AUDIO_SEGMENT_MS = 10000;   // 每段 10 秒（可调）
+
+  let _audioStream = null;          // MediaStream（来自 video.captureStream）
+  let _audioTimer = null;           // 音频轨定时器句柄
+  let _audioSegSeq = 0;             // 音频段序号
+  let _audioMimeType = null;        // 选定的 MIME 类型
+
+  /** 选一次 MIME 类型（懒初始化） */
+  function _getAudioMime() {
+    if (_audioMimeType) return _audioMimeType;
+    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg'];
+    _audioMimeType = candidates.find(m => MediaRecorder.isTypeSupported(m)) || 'audio/webm';
+    return _audioMimeType;
+  }
+
+  /** 初始化音频流（懒加载，只取音轨） */
+  function _ensureAudioStream(video) {
+    if (_audioStream) return _audioStream;
+    try {
+      if (!video.captureStream) {
+        console.log('[AI Video] 🔇 浏览器不支持 captureStream，跳过音频轨');
+        return null;
+      }
+      const stream = video.captureStream();
+      const audioTracks = stream.getAudioTracks();
+      if (!audioTracks.length) {
+        console.log('[AI Video] 🔇 视频无音轨');
+        return null;
+      }
+      _audioStream = new MediaStream(audioTracks);
+      console.log('[AI Video] 🎙️ 音频流就绪，轨道:', audioTracks[0].label);
+      return _audioStream;
+    } catch (e) {
+      console.warn('[AI Video] 音频流初始化失败:', e.message);
+      return null;
+    }
+  }
+
+  /**
+   * 启动独立音频轨循环录制。
+   * 每完成一段立即发送 audio_segment 消息，同时自动开始下一段。
+   */
+  function startAudioTrack(video) {
+    if (_audioTimer) return;   // 已在运行
+
+    const stream = _ensureAudioStream(video);
+    if (!stream) return;       // 无音轨，静默退出
+
+    const mimeType = _getAudioMime();
+    console.log(`[AI Video] 🎙️ 音频轨启动，每段 ${AUDIO_SEGMENT_MS / 1000}s，格式: ${mimeType}`);
+
+    function _recordOneSegment() {
+      if (!isAnalyzing) return;  // 已停止分析，终止循环
+
+      const segStartTime = video.currentTime;
+      const segStartWall = Date.now();
+      const chunks = [];
+
+      let recorder;
+      try {
+        recorder = new MediaRecorder(stream, { mimeType });
+      } catch (e) {
+        console.warn('[AI Video] MediaRecorder 创建失败:', e.message);
+        return;
+      }
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const segEndTime = video.currentTime;
+        // 录完后立即开始下一段，不等待发送
+        if (isAnalyzing) _audioTimer = setTimeout(_recordOneSegment, 0);
+
+        if (!chunks.length) return;
+        const blob = new Blob(chunks, { type: mimeType });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const b64 = reader.result.split(',')[1];
+          if (!b64) return;
+          _audioSegSeq++;
+          const segData = {
+            seq: _audioSegSeq,
+            audio_b64: b64,
+            start_sec: segStartTime,
+            end_sec: segEndTime,
+            video_url: window.location.href,
+            title: document.title,
+          };
+          console.log(`[AI Video] 🎙️ 音频段 #${_audioSegSeq} [${segStartTime.toFixed(1)}s~${segEndTime.toFixed(1)}s] `
+            + `(${(b64.length * 0.75 / 1024).toFixed(0)} KB)`);
+          safeSendMessage({ type: 'audio_segment', data: segData }, null);
+        };
+        reader.readAsDataURL(blob);
+      };
+
+      recorder.onerror = (e) => {
+        console.warn('[AI Video] 录音错误:', e.error?.message);
+        if (isAnalyzing) _audioTimer = setTimeout(_recordOneSegment, 1000);
+      };
+
+      recorder.start();
+      // AUDIO_SEGMENT_MS 后停止，触发 onstop 并自动开始下一段
+      _audioTimer = setTimeout(() => {
+        if (recorder.state === 'recording') recorder.stop();
+      }, AUDIO_SEGMENT_MS);
+    }
+
+    _recordOneSegment();
+  }
+
+  /** 停止音频轨 */
+  function stopAudioTrack() {
+    if (_audioTimer) {
+      clearTimeout(_audioTimer);
+      _audioTimer = null;
+    }
+    if (_audioStream) {
+      _audioStream.getTracks().forEach(t => t.stop());
+      _audioStream = null;
+    }
+    _audioMimeType = null;
+    console.log('[AI Video] 🔇 音频轨已停止');
+  }
+
+  // =====================================================================
+  // 纯视觉帧捕获（不再附带音频）
+  // =====================================================================
   function captureAndSendFrame(video) {
     if (isSendingFrame) {
       console.log('[AI Video] ⏭️ 上一帧处理中，跳过本次截帧');
@@ -562,7 +699,6 @@
       const progressPct = Math.min(frameSeq * 5, 95);
       showProgress(progressPct, `帧 #${frameSeq} 发送中...`);
       updateStatus(`📸 帧 #${frameSeq}`, true);
-
       console.log(`[AI Video] 📸 发送帧 #${frameSeq} (t=${currentTime.toFixed(1)}s)`);
 
       safeSendMessage({
