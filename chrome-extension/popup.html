@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8f9fa;
+      width: 380px;
+      overflow-x: hidden;
+    }
+
+    /* ===== Header ===== */
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header-left { display: flex; align-items: center; gap: 8px; }
+    .header h3 { font-size: 15px; font-weight: 600; }
+    .header-badge {
+      font-size: 10px; padding: 2px 7px; border-radius: 10px;
+      background: rgba(255,255,255,0.2); font-weight: 500;
+    }
+
+    /* ===== 主卡片 ===== */
+    .main-card {
+      margin: 12px 14px;
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      overflow: hidden;
+    }
+
+    /* ---- 本地服务状态区 ---- */
+    .status-section {
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .status-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .status-title {
+      font-size: 13px; font-weight: 600; color: #333;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .status-badge {
+      font-size: 10px; padding: 2px 8px; border-radius: 10px;
+      font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .status-badge.offline { background: #ffebee; color: #c62828; }
+    .status-badge.online { background: #e8f5e9; color: #2e7d32; }
+    .status-badge.connecting { background: #e3f2fd; color: #1565c0; }
+
+    /* 本地进程信息 */
+    .local-info {
+      background: #fafbfc; border-radius: 10px; padding: 10px 12px;
+      font-size: 11px; line-height: 1.8;
+    }
+    .info-row { display: flex; justify-content: space-between; }
+    .info-label { color: #999; }
+    .info-value { color: #333; font-weight: 500; font-family: 'SF Mono', Monaco, monospace; font-size: 10px; }
+
+    /* 提示文字 */
+    .hint-text {
+      font-size: 11px; color: #888; text-align: center;
+      padding: 8px 0 4px; line-height: 1.5;
+    }
+    .hint-text code {
+      background: #eee; padding: 1px 5px; border-radius: 3px;
+      font-size: 10px; color: #555;
+    }
+
+    /* ---- 连接操作区 ---- */
+    .connect-section {
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .btn {
+      padding: 9px 20px;
+      border: none; border-radius: 10px;
+      cursor: pointer; font-size: 13px; font-weight: 600;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+    .btn-connect {
+      flex: 1; justify-content: center;
+      background: linear-gradient(135deg, #4caf50, #43a047); color: white;
+    }
+    .btn-connect:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(76,175,80,0.35); }
+    .btn-connect.connected {
+      background: #e8f5e9; color: #2e7d32; cursor: default;
+      box-shadow: none; border: 1.5px solid #c8e6c9;
+    }
+    .btn-disconnect {
+      padding: 7px 14px; font-size: 12px; border-radius: 8px;
+      background: white; color: #f44336; border: 1.5px solid #ffcdd2;
+    }
+    .btn-disconnect:hover:not(:disabled) { background: #ffebee; border-color: #ef9a9a; }
+
+    /* VL 模型状态 */
+    .model-status {
+      display: none;
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #f0f4ff; border-radius: 10px;
+      border-left: 3px solid #667eea;
+    }
+    .model-status.visible { display: block; }
+    .model-status-title {
+      font-size: 11px; font-weight: 600; color: #667eea; margin-bottom: 6px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .model-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 2px 0; font-size: 11px;
+    }
+    .model-item-name { color: #666; }
+    .model-item-val { font-weight: 500; font-size: 10px; }
+    .model-item-val.ready { color: #4caf50; }
+    .model-item-val.loading { color: #667eea; }
+    .model-item-val.pending { color: #999; }
+    .spinner {
+      width: 12px; height: 12px; border: 2px solid #c5cae9; border-top-color: #667eea;
+      border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== 分析按钮区 ===== */
+    .analyze-section {
+      padding: 16px;
+      text-align: center;
+    }
+    .btn-analyze {
+      width: 100%; padding: 14px 20px;
+      border: none; border-radius: 12px;
+      cursor: pointer; font-size: 15px; font-weight: 700;
+      transition: all 0.2s ease;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      box-shadow: 0 4px 15px rgba(102,126,234,0.3);
+    }
+    .btn-analyze:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; box-shadow: none; }
+    .btn-analyze:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102,126,234,0.4); }
+    .btn-analyze:active:not(:disabled) { transform: scale(0.97); }
+    .analyze-hint {
+      margin-top: 8px; font-size: 11px; color: #aaa; line-height: 1.4;
+    }
+
+    /* ===== 进度条 ===== */
+    .progress-section {
+      display: none; padding: 0 14px 12px;
+    }
+    .progress-section.visible { display: block; }
+    .progress-track {
+      width: 100%; height: 5px; background: #eee; border-radius: 3px; overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      border-radius: 3px; transition: width 0.3s ease;
+    }
+    .progress-label {
+      font-size: 11px; color: #888; margin-top: 4px;
+      display: flex; justify-content: space-between;
+    }
+
+    /* ===== Footer ===== */
+    .footer {
+      padding: 8px 18px; text-align: center;
+      font-size: 10px; color: #ccc;
+      border-top: 1px solid #f0f0f0;
+    }
+
+    /* ===== 日志入口 ===== */
+    .log-entry {
+      padding: 6px 14px 10px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .log-entry button {
+      font-size: 10px; color: #999; background: none; border: none; cursor: pointer;
+      padding: 3px 8px; border-radius: 4px;
+    }
+    .log-entry button:hover { background: #f0f0f0; color: #666; }
+
+    /* 刷新按钮 */
+    .btn-refresh {
+      padding: 4px 10px; border: 1.5px solid #e0e0e0; border-radius: 6px;
+      background: white; cursor: pointer; font-size: 11px; color: #666;
+      display: inline-flex; align-items: center; gap: 3px;
+      transition: all 0.2s;
+    }
+    .btn-refresh:hover { background: #f5f5f5; border-color: #ccc; color: #333; }
+    .btn-refresh:active { transform: scale(0.95); }
+    .btn-refresh .refresh-icon { display: inline-block; transition: transform 0.3s; }
+    .btn-refresh.spinning .refresh-icon { animation: spin 0.5s linear infinite; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h3>🎬 AI 视频分析</h3>
+      <span class="header-badge">v4.0</span>
+    </div>
+  </div>
+
+  <!-- 主卡片 -->
+  <div class="main-card">
+
+    <!-- 本地服务状态 -->
+    <div class="status-section">
+      <div class="status-header">
+        <span class="status-title">🖥️ 本地服务</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button id="btn-refresh" class="btn-refresh" title="刷新状态">
+            <span class="refresh-icon">🔄</span> 刷新
+          </button>
+          <span id="service-badge" class="status-badge offline">未检测到</span>
+        </div>
+      </div>
+
+      <!-- 本地进程信息 (检测到后显示) -->
+      <div id="local-info" class="local-info" style="display:none;">
+        <div class="info-row"><span class="info-label">PID</span><span class="info-value" id="info-pid">-</span></div>
+        <div class="info-row"><span class="info-label">Python</span><span class="info-value" id="info-python" style="font-family:-apple-system,sans-serif;font-size:11px;">-</span></div>
+        <div class="info-row"><span class="info-label">运行时长</span><span class="info-value" id="info-uptime">-</span></div>
+        <div class="info-row"><span class="info-label">消息数</span><span class="info-value" id="info-msgs">-</span></div>
+        <div class="info-row"><span class="info-label">VL 模型</span><span class="info-value" id="vl-model-name">-</span></div>
+      </div>
+
+<!-- 未检测到时的提示 -->
+<div id="hint-offline" class="hint-text">
+  请先在终端启动本地服务:<br>
+  <code>python3 native-host/websocket_server.py</code><br>
+  <span style="color:#bbb;font-size:10px;">启动后点击"连接服务"即可 (ws://127.0.0.1:19527)</span>
+</div>
+
+      <!-- VL 模型状态 -->
+      <div id="model-status" class="model-status">
+        <div class="model-status-title"><span class="spinner"></span>视觉模型</div>
+        <div class="model-item"><span class="model-item-name">Qwen2-VL</span><span class="model-item-val pending" id="vl-status">⏳ 待加载</span></div>
+      </div>
+    </div>
+
+    <!-- 连接操作 -->
+    <div class="connect-section">
+      <button id="btn-connect" class="btn btn-connect">🔗 连接服务</button>
+      <button id="btn-disconnect" class="btn btn-disconnect" disabled title="断开连接">断开</button>
+    </div>
+
+    <!-- 实时分析按钮 -->
+    <div class="analyze-section">
+      <button id="btn-analyze" class="btn-analyze" disabled>
+        👁️ 开始实时分析
+      </button>
+      <div class="analyze-hint">在视频页面点击，自动截帧 → VL 模型推理 → 结果回显</div>
+    </div>
+
+  </div>
+
+  <!-- 进度条 -->
+  <div id="progress-section" class="progress-section">
+    <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+    <div class="progress-label">
+      <span id="progress-stage">准备中...</span>
+      <span id="progress-pct">0%</span>
+    </div>
+  </div>
+
+  <!-- 日志入口 -->
+  <div class="log-entry">
+    <span style="font-size:10px;color:#bbb;">AI Video Analyzer v4.0 · VL Mode</span>
+    <button id="btn-open-log">📂 日志</button>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">Powered by Qwen2-VL · Mac Optimized</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

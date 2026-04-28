@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "AI Video Analyzer",
+  "version": "3.0",
+  "description": "Real-time video analysis with local AI models (Qwen2-VL) via WebSocket",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "alarms",
+    "scripting"
+  ],
+  "host_permissions": [
+    "ws://127.0.0.1:19527/",
+    "*://*.bilibili.com/*",
+    "*://*.youtube.com/*",
+    "*://*.youku.com/*",
+    "*://*.iqiyi.com/*",
+    "*://*.v.qq.com/*",
+    "*://*.ixigua.com/*",
+    "*://*.tiktok.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.bilibili.com/*",
+        "*://*.youtube.com/*",
+        "*://*.youku.com/*",
+        "*://*.iqiyi.com/*",
+        "*://*.v.qq.com/*",
+        "*://*.ixigua.com/*",
+        "*://*.tiktok.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
+

@@ -1,0 +1,37 @@
+{
+  "model": {
+    "name": "Qwen/Qwen2-VL-2B-Instruct",
+    "device": "auto",
+    "torch_dtype": "float32",
+    "max_new_tokens": 512,
+    "summary_max_tokens": 2048
+  },
+  "video": {
+    "target_fps": 0.2,
+    "batch_size": 4,
+    "frame_resolution": [512, 512],
+    "summary_mode": {
+      "keyframe_interval_sec": 5,
+      "enable_final_summary": true
+    }
+  },
+  "asr": {
+    "model_size": "medium",
+    "device": "auto",
+    "compute_type": "float32",
+    "language": "zh",
+    "cache_dir": ""
+  },
+  "output": {
+    "output_dir": "",
+    "assets_subdir": ".assets",
+    "default_title_format": "{video_name}_内容分析"
+  },
+  "analysis_mode": "asr",
+  "preload_on_start": true,
+  "summary": {
+    "every_n_frames": 5,
+    "note": "每积累 N 帧触发一次增量总结，值越小总结越频繁但消耗更多 GPU"
+  }
+}
+
