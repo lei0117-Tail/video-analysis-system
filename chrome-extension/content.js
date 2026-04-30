@@ -600,6 +600,7 @@
             end_sec: segEndTime,
             video_url: window.location.href,
             title: document.title,
+            duration: video.duration || 0,
           };
           console.log(`[AI Video] 🎙️ 音频段 #${_audioSegSeq} [${segStartTime.toFixed(1)}s~${segEndTime.toFixed(1)}s] `
             + `(${(b64.length * 0.75 / 1024).toFixed(0)} KB)`);
@@ -686,12 +687,22 @@
       isSendingFrame = true;
       frameSeq++;
 
+      // 安全超时：最多等 25 秒，防止后端推理慢时锁永久卡住
+      const _lockSeq = frameSeq;
+      setTimeout(() => {
+        if (isSendingFrame) {
+          console.warn(`[AI Video] ⚠️ 帧 #${_lockSeq} 超时解锁（25s 未收到响应）`);
+          isSendingFrame = false;
+        }
+      }, 25000);
+
       const frameData = {
         frames: [{ base64, timestamp: currentTime, width: w, height: h }],
         video_url: window.location.href,
         title: document.title,
         frame_seq: frameSeq,
         seq: frameSeq,
+        duration: video.duration || 0,
       };
       lastFrameData = frameData;
       reconnectRetryCount = 0;
@@ -849,7 +860,7 @@
     // 真正结果通过 notes_saved 消息异步推送，由 onMessage 的 notes_saved 分支处理
     safeSendMessage({
       type: 'save_notes',
-      data: { note, url: window.location.href, title: document.title, timestamp: new Date().toISOString(), analysis_results },
+      data: { note, url: window.location.href, title: document.title, timestamp: new Date().toISOString(), analysis_results: analysisResults },
     }, (response) => {
       if (!response || !response.sent) {
         alert('❌ 保存请求发送失败，WebSocket 连接可能已断开');

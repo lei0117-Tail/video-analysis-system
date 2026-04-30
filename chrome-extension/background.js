@@ -135,6 +135,11 @@ function handleMessageFromServer(message) {
       forwardToActiveTab({ type: 'frame_received', frame_count: message.frame_count });
       break;
 
+    case 'audio_segment_received':
+      // 服务端已收到音频段，无需转发到 tab，仅打印日志
+      console.log(`[BG] 🎙️ 音频段 #${message.seq} 已接收`);
+      break;
+
     case 'frame_analysis_result':
       forwardToActiveTab({ type: 'frame_analysis_result', results: message.results });
       break;
@@ -330,6 +335,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // ---- VL 帧分析（来自 content script）----
     case 'analyze_frame': {
       const sent = sendToWS({ type: 'analyze_frame', data: request.data });
+      sendResponse({ sent });
+      return false;
+    }
+
+    // ---- 音频段（来自 content script 音频轨）----
+    case 'audio_segment': {
+      const sent = sendToWS({ type: 'audio_segment', data: request.data });
+      // 音频数据量大，不等待响应，fire-and-forget
       sendResponse({ sent });
       return false;
     }
